@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业微信联系人服务</title>
+    <script src="https://wwcdn.weixin.qq.com/node/open/js/wecom-jssdk-2.3.1.js"></script>
+    <style>
+        /* 保持原有样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        button {
+            background-color: #07C160;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #05A852;
+        }
+        .info {
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        .userid-display {
+            background-color: #f5f5f5;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+        .error-details {
+            color: #d32f2f;
+            text-align: left;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 12px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>联系客服</h1>
+        <div class="userid-display" id="useridDisplay">正在加载...</div>
+        <button id="chatBtn" disabled>立即联系</button>
+        <div class="info">
+            <p>请在企业微信中打开此页面</p>
+        </div>
+        <div class="error-details" id="errorDetails" style="display:none;"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const errorDetails = document.getElementById('errorDetails');
+            
+            // 1. 验证SDK是否加载
+            if (typeof ww === 'undefined') {
+                document.getElementById('useridDisplay').textContent = "错误：企业微信JS-SDK未加载";
+                errorDetails.textContent = "请检查是否在企业微信中打开，或网络问题导致SDK加载失败";
+                errorDetails.style.display = "block";
+                console.error("企业微信JS-SDK未加载，请检查引入路径");
+                return;
+            }
+            
+            console.log("企业微信JS-SDK已加载，版本:", ww.SDK_VERSION);
+            
+            // 2. 从URL参数获取userid
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('userid');
+            const useridDisplay = document.getElementById('useridDisplay');
+            
+            if (!userId) {
+                useridDisplay.textContent = "错误：缺少userid参数";
+                errorDetails.textContent = "URL中必须包含userid参数，例如：?userid=U0009748";
+                errorDetails.style.display = "block";
+                console.error("URL中缺少userid参数");
+                return;
+            }
+            
+            // 显示目标用户ID
+            useridDisplay.textContent = "目标用户: " + userId;
+            
+            // 3. 从URL参数获取当前页面地址（用于签名）
+            const currentUrl = encodeURIComponent(window.location.href.split('#')[0]);
+            console.log("当前页面URL:", currentUrl);
+            
+            // 4. 获取企业微信配置
+            const apiUrl = `/.netlify/functions/getWxConfig?url=${currentUrl}`;
+            console.log("请求API:", apiUrl);
+            
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误! 状态: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(config => {
+                    console.log("API响应:", config);
+                    
+                    if (config.errmsg) {
+                        useridDisplay.textContent = "配置错误";
+                        errorDetails.textContent = config.errmsg + (config.details ? "\n详情: " + config.details : "");
+                        errorDetails.style.display = "block";
+                        console.error("获取配置失败:", config);
+                        return;
+                    }
+                    
+                    // 5. 配置企业微信JS-SDK
+                    ww.config({
+                        beta: true,
+                        debug: false,
+                        appId: config.corpId,
+                        agentId: config.agentId,
+                        timestamp: config.timestamp,
+                        nonceStr: config.nonceStr,
+                        signature: config.signature,
+                        jsApiList: ['openEnterpriseChat']
+                    });
+                    
+                    ww.ready(function() {
+                        // 6. 验证openEnterpriseChat方法是否可用
+                        if (typeof ww.openEnterpriseChat !== 'function') {
+                            useridDisplay.textContent = "错误：openEnterpriseChat方法不可用";
+                            errorDetails.textContent = "JS-SDK未正确配置openEnterpriseChat权限";
+                            errorDetails.style.display = "block";
+                            console.error("openEnterpriseChat方法不可用，请检查权限");
+                            return;
+                        }
+                        
+                        // 7. 启用按钮并设置点击事件
+                        const chatBtn = document.getElementById('chatBtn');
+                        chatBtn.disabled = false;
+                        chatBtn.textContent = "联系 " + userId;
+                        
+                        chatBtn.onclick = function() {
+                            // 8. 使用自定义userid调用openEnterpriseChat
+                            console.log("尝试打开与", userId, "的聊天窗口");
+                            ww.openEnterpriseChat({
+                                groupName: "客服团队",
+                                userIds: [userId],
+                                externalUserIds: []
+                            });
+                        };
+                    });
+                    
+                    ww.error(function(res) {
+                        console.error("JS-SDK配置失败:", res);
+                        useridDisplay.textContent = "JS-SDK配置失败";
+                        errorDetails.textContent = "请检查企业微信后台域名配置";
+                        errorDetails.style.display = "block";
+                    });
+                })
+                .catch(error => {
+                    console.error("请求错误:", error);
+                    useridDisplay.textContent = "服务不可用";
+                    errorDetails.textContent = "API请求失败: " + error.message;
+                    errorDetails.style.display = "block";
+                });
+        });
+    </script>
+</body>
+</html>
