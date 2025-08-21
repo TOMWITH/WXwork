@@ -1,9 +1,9 @@
 const axios = require('axios');
 
-// 从环境变量获取配置
-const CORP_ID = process.env.WX_CORP_ID;
-const CORP_SECRET = process.env.WX_CORP_SECRET;
-const AGENT_ID = process.env.WX_AGENT_ID;
+// 直接在代码中定义企业微信配置（替代环境变量）
+const CORP_ID = 'wwc911c66f428215b3';
+const CORP_SECRET = 'KwSK-uSczRjDo_6NQ10wZHUGpGvVJ2g1sdQDw-1SU9k';
+const AGENT_ID = '1000002';
 
 // 获取access_token
 async function getAccessToken() {
@@ -27,17 +27,6 @@ function createSignature(jsapiTicket, nonceStr, timestamp, url) {
 
 exports.handler = async (event, context) => {
     try {
-        // 验证环境变量是否设置
-        if (!CORP_ID || !CORP_SECRET || !AGENT_ID) {
-            return {
-                statusCode: 500,
-                body: JSON.stringify({
-                    errmsg: "环境变量未正确配置",
-                    details: "请确保设置了WX_CORP_ID, WX_CORP_SECRET, WX_AGENT_ID"
-                })
-            };
-        }
-
         // 获取URL参数
         const urlParams = new URLSearchParams(event.queryStringParameters);
         const url = urlParams.get('url');
@@ -45,7 +34,10 @@ exports.handler = async (event, context) => {
         if (!url) {
             return {
                 statusCode: 400,
-                body: JSON.stringify({ errmsg: "缺少url参数" })
+                body: JSON.stringify({ 
+                    errmsg: "缺少url参数", 
+                    details: "请求中必须包含url参数" 
+                })
             };
         }
 
@@ -55,7 +47,30 @@ exports.handler = async (event, context) => {
         
         // 获取access_token和jsapi_ticket
         const accessToken = await getAccessToken();
+        
+        // 检查access_token是否有效
+        if (!accessToken) {
+            return {
+                statusCode: 500,
+                body: JSON.stringify({
+                    errmsg: "获取access_token失败",
+                    details: "请检查CORP_ID和CORP_SECRET是否正确"
+                })
+            };
+        }
+        
         const jsapiTicket = await getJsApiTicket(accessToken);
+        
+        // 检查jsapi_ticket是否有效
+        if (!jsapiTicket) {
+            return {
+                statusCode: 500,
+                body: JSON.stringify({
+                    errmsg: "获取jsapi_ticket失败",
+                    details: "可能access_token无效或权限不足"
+                })
+            };
+        }
         
         // 生成签名
         const signature = createSignature(jsapiTicket, nonceStr, timestamp, url);
