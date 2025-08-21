@@ -1,0 +1,8 @@
+{
+  "name": "wx-contact-service",
+  "version": "1.0.0",
+  "description": "企业微信联系人服务",
+  "scripts": {
+    "build": "echo 'No build needed for static site'"
+  }
+}
