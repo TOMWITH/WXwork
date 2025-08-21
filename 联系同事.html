@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>联系同事</title>
+    <script src="https://open.work.weixin.qq.com/wwopen/js/jwxwork-1.0.0.js"></script>
+</head>
+<body>
+    <script>
+        // 从URL参数获取目标UserID (支持单个或多个联系人)
+        const params = new URLSearchParams(location.search);
+        const userIds = params.get('userid').split(',').filter(Boolean);
+        
+        // 调用企业微信API打开聊天窗口
+        wx.ready(() => {
+            wx.invoke('openEnterpriseChat', {
+                userIds: userIds
+            }, res => {
+                // 跳转成功后关闭页面
+                if(res.err_msg === 'openEnterpriseChat:ok') {
+                    setTimeout(() => {
+                        window.close();
+                    }, 300);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
